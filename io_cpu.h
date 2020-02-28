@@ -102,7 +102,7 @@ same70_main_rc_oscillator_get_frequency (io_cpu_clock_pointer_t this) {
 }
 
 static bool
-same70_main_rc_oscillator_start (io_cpu_clock_pointer_t this) {
+same70_main_rc_oscillator_start (io_t *io,io_cpu_clock_pointer_t this) {
 	return true;
 /*
 	if (RCC_GetFlagStatus(RCC_FLAG_HSERDY) == 0) {
@@ -141,8 +141,8 @@ same70_core_clock_get_frequency (io_cpu_clock_pointer_t clock) {
 }
 
 static bool
-same70_core_clock_start (io_cpu_clock_pointer_t clock) {
-	if (io_cpu_dependant_clock_start_input (clock)) {
+same70_core_clock_start (io_t *io,io_cpu_clock_pointer_t clock) {
+	if (io_cpu_dependant_clock_start_input (io,clock)) {
 
 		return true;
 	} else {
@@ -344,7 +344,7 @@ initialise_cpu_io (io_t *io) {
 
 	this->in_event_thread = false;
 
-	io_cpu_clock_start (io_get_core_clock(io));
+	io_cpu_clock_start (io,io_get_core_clock(io));
 
 	register_io_interrupt_handler (io,PendSV_IRQn,event_thread,io);
 	register_io_interrupt_handler (io,HardFault_IRQn,hard_fault,io);
