@@ -49,6 +49,7 @@ typedef union PACK_STRUCTURE {
 	io_byte_memory_t *bm;\
 	uint32_t in_event_thread;\
 	io_value_pipe_t *tasks;\
+	uint32_t prbs_state[4]; \
 	/**/
 
 typedef struct PACK_STRUCTURE io_same70_cpu {
@@ -170,7 +171,6 @@ Pio* port_map[] = {
 	PIOE,
 };
 
-
 //
 // io methods
 //
@@ -193,7 +193,7 @@ same70_do_gc (io_t *io,int32_t count) {
 
 static uint32_t
 same70_get_random_u32 (io_t *io) {
-	uint32_t r = 0;
+	uint32_t r = 0x8764000b;
 	return r;
 }
 
@@ -279,6 +279,32 @@ same70_unregister_interrupt_handler (
 	}
 }
 
+INLINE_FUNCTION uint32_t prbs_rotl(const uint32_t x, int k) {
+	return (x << k) | (x >> (32 - k));
+}
+
+static uint32_t
+same70_get_prbs_random_u32 (io_t *io) {
+	io_same70_cpu_t *this = (io_same70_cpu_t*) io;
+	uint32_t *s = this->prbs_state;
+	bool h = enter_io_critical_section (io);
+	const uint32_t result = prbs_rotl (s[0] + s[3], 7) + s[0];
+
+	const uint32_t t = s[1] << 9;
+
+	s[2] ^= s[0];
+	s[3] ^= s[1];
+	s[1] ^= s[2];
+	s[0] ^= s[3];
+
+	s[2] ^= t;
+
+	s[3] = prbs_rotl (s[3], 11);
+
+	exit_io_critical_section (io,h);
+	return result;
+}
+
 static void
 same70_panic (io_t *io,int code) {
 	DISABLE_INTERRUPTS;
@@ -298,6 +324,7 @@ add_io_implementation_cpu_methods (io_implementation_t *io_i) {
 	io_i->get_short_term_value_memory = same70_io_get_stvm;
 	io_i->do_gc = same70_do_gc;
 	io_i->get_random_u32 = same70_get_random_u32;
+	io_i->get_next_prbs_u32 = same70_get_prbs_random_u32;
 	io_i->signal_task_pending = same70_signal_task_pending;
 	io_i->enqueue_task = same70_enqueue_task;
 //	io_i->do_next_task = same70_do_next_task;
@@ -348,6 +375,11 @@ initialise_cpu_io (io_t *io) {
 
 	register_io_interrupt_handler (io,PendSV_IRQn,event_thread,io);
 	register_io_interrupt_handler (io,HardFault_IRQn,hard_fault,io);
+
+	this->prbs_state[0] = io_get_random_u32(io);
+	this->prbs_state[1] = 0xf542d2d3;
+	this->prbs_state[2] = 0x6fa035c3;
+	this->prbs_state[3] = 0x77f2db5b;
 }
 
 static void
