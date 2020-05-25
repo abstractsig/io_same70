@@ -9,7 +9,6 @@
 typedef struct PACK_STRUCTURE same70_uart {
 	IO_SOCKET_STRUCT_MEMBERS
 
-	io_t *io;
 	io_encoding_implementation_t const *encoding;
 	io_cpu_clock_pointer_t peripheral_clock;
 	Uart *uart_registers;
@@ -71,18 +70,18 @@ same70_uart_interrupt (void *user_value) {
 }
 
 static io_socket_t*
-same70_uart_initialise (io_socket_t *socket,io_t *io,io_socket_constructor_t const *C) {
+same70_uart_initialise (io_socket_t *socket,io_t *io,io_settings_t const *C) {
 	same70_uart_t *this = (same70_uart_t*) socket;
 
 	this->io = io;
 	this->encoding = C->encoding;
 	
 	this->tx_pipe = mk_io_encoding_pipe (
-		io_get_byte_memory(io),io_socket_constructor_transmit_pipe_length(C)
+		io_get_byte_memory(io),io_settings_transmit_pipe_length(C)
 	);
 
 	this->rx_pipe = mk_io_byte_pipe (
-		io_get_byte_memory(io),io_socket_constructor_receive_pipe_length(C)
+		io_get_byte_memory(io),io_settings_receive_pipe_length(C)
 	);
 	
 	initialise_io_event (
@@ -143,7 +142,7 @@ same70_uart_put_char (Uart* uart, uint8_t c) {
 }
 
 static bool
-same70_uart_open (io_socket_t *socket) {
+same70_uart_open (io_socket_t *socket,io_socket_open_flag_t flag) {
 	same70_uart_t *this = (same70_uart_t*) socket;
 	Uart *uart = this->uart_registers;
 	
@@ -192,16 +191,6 @@ same70_uart_close (io_socket_t *socket) {
 	release_io_pin (this->io,this->tx_pin.io);
 }
 
-static io_event_t*
-same70_uart_bindr (io_socket_t *socket,io_event_t *rx) {
-	return NULL;
-}
-
-static io_pipe_t*
-same70_uart_bindt (io_socket_t *socket,io_event_t *ev) {
-	return NULL;
-}
-
 static io_encoding_t*
 same70_uart_new_message (io_socket_t *socket) {
 	same70_uart_t *this = (same70_uart_t*) socket;
@@ -215,7 +204,7 @@ same70_uart_output_next_buffer (same70_uart_t *this) {
 	io_encoding_t *next;
 	if (io_encoding_pipe_peek (this->tx_pipe,&next)) {
 		const uint8_t *byte,*end;
-		io_encoding_get_ro_bytes (next,&byte,&end);
+		io_encoding_get_content (next,&byte,&end);
 		io_dma_transfer_to_peripheral (
 			(io_dma_channel_t*) &this->tx_dma_channel,byte,end - byte
 		);
@@ -228,19 +217,16 @@ same70_uart_output_next_buffer (same70_uart_t *this) {
 static void
 same70_uart_tx_dma_complete (io_event_t *ev) {
 	same70_uart_t *this = ev->user_value;
-	io_encoding_t *next;
 	
-	if (io_encoding_pipe_get_encoding (this->tx_pipe,&next)) {
-		unreference_io_encoding (next);
-	} else {
+	if (!io_encoding_pipe_pop_encoding (this->tx_pipe)) {
 		io_panic (this->io,IO_PANIC_SOMETHING_BAD_HAPPENED);
 	}
 	
 	if (
 			!same70_uart_output_next_buffer (this)
-		&& io_event_is_valid (io_pipe_event (this->tx_pipe))
+//		&& io_event_is_valid (io_pipe_event (this->tx_pipe))
 	) {
-		io_enqueue_event (this->io,io_pipe_event (this->tx_pipe));
+//		io_enqueue_event (this->io,io_pipe_event (this->tx_pipe));
 	}
 }
 
@@ -266,30 +252,20 @@ same70_uart_send_message (io_socket_t *socket,io_encoding_t *encoding) {
 	}
 }
 
-static io_t*
-same70_uart_get_io (io_socket_t *socket) {
-	same70_uart_t *this = (same70_uart_t*) socket;
-	return this->io;
-}
-
 static size_t
 same70_uart_mtu (io_socket_t const *socket) {
 	return 1024;
 }
 
 EVENT_DATA io_socket_implementation_t same70_uart_implementation = {
-	.specialisation_of = &io_physical_socket_implementation_base,
+	SPECIALISE_IO_SOCKET_IMPLEMENTATION (
+		&io_physical_socket_implementation
+	)
 	.initialise = same70_uart_initialise,
-	.free = NULL,
-	.get_io = same70_uart_get_io,
 	.open = same70_uart_open,
 	.close = same70_uart_close,
-	.bindr = same70_uart_bindr,
-	.bindt = same70_uart_bindt,
 	.new_message = same70_uart_new_message,
 	.send_message = same70_uart_send_message,
-	.iterate_inner_sockets = NULL,
-	.iterate_outer_sockets = NULL,
 	.mtu = same70_uart_mtu,
 };
 
