@@ -15,10 +15,14 @@
 static void
 same70_xdmac_interurpt (void *user_value) {
 	io_same70_cpu_t *this = user_value;
-	io_dma_channel_t *channel = this->dma_channel_list;
+	stm32_io_dma_channel_t *channel = (stm32_io_dma_channel_t*) (
+		this->dma_channel_list
+	);
 	
 	while (channel) {
-		volatile uint32_t status = XDMAC->XDMAC_CHID[0].XDMAC_CIS;	// clears pend
+		volatile uint32_t status = XDMAC->XDMAC_CHID [
+			stm32_io_dma_channel_number(channel)
+		].XDMAC_CIS;	// clears pend
 		
 		if ((status & XDMAC_CIS_BIS) != 0) {
 			io_enqueue_event (user_value,&channel->complete);
@@ -28,7 +32,7 @@ same70_xdmac_interurpt (void *user_value) {
 			//io_enqueue_event (user_value,&channel->error);
 		}
 		
-		channel = channel->next_channel;
+		channel = (stm32_io_dma_channel_t*) channel->next_channel;
 	}
 }
 

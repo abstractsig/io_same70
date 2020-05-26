@@ -224,9 +224,9 @@ same70_uart_tx_dma_complete (io_event_t *ev) {
 	
 	if (
 			!same70_uart_output_next_buffer (this)
-//		&& io_event_is_valid (io_pipe_event (this->tx_pipe))
+//		&& (this->tx_available != NULL)
 	) {
-//		io_enqueue_event (this->io,io_pipe_event (this->tx_pipe));
+//		io_enqueue_event (this->io,this->tx_available);
 	}
 }
 
