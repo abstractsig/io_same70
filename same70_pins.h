@@ -261,7 +261,7 @@ pio_enable_write_protection (Pio *pio) {
 	);
 }
 
-static void
+void
 same70_write_to_io_pin (io_t *io,io_pin_t rpin,int32_t state) {
 	same70_io_pin_t pin = {rpin};
 	Pio *pio = same70_io_pin_pio (pin);
@@ -273,7 +273,7 @@ same70_write_to_io_pin (io_t *io,io_pin_t rpin,int32_t state) {
 	}
 }
 
-static void
+void
 same70_set_io_pin_to_output (io_t *io,io_pin_t rpin) {
 	same70_io_pin_t pin = {rpin};
 	Pio *pio = same70_io_pin_pio (pin);
@@ -326,7 +326,7 @@ setup_same70_pin_as_input (Pio *pio,same70_io_pin_t pin,uint32_t mask) {
 	}
 }
 
-static void
+void
 same70_set_io_pin_to_input (io_t *io,io_pin_t rpin) {
 	same70_io_pin_t pin = {rpin};
 	Pio *pio = same70_io_pin_pio (pin);
@@ -342,7 +342,7 @@ same70_set_io_pin_to_input (io_t *io,io_pin_t rpin) {
 	pio_enable_write_protection (pio);
 }
 
-static void
+void
 same70_set_io_pin_to_alternate (io_t *io,io_pin_t rpin) {
 	same70_io_pin_t pin = {rpin};
 	Pio *pio = same70_io_pin_pio (pin);
@@ -367,7 +367,7 @@ same70_set_io_pin_to_alternate (io_t *io,io_pin_t rpin) {
 	pio_enable_write_protection (pio);
 }
 
-static int32_t
+int32_t
 same70_read_io_input_pin (io_t *io,io_pin_t rpin) {
 	same70_io_pin_t pin = {rpin};
 	Pio *pio = same70_io_pin_pio (pin);
@@ -456,7 +456,7 @@ same70_io_pin_test_valid (io_t *io,io_pin_t rpin) {
 	return same70_io_pin_is_valid (pin);
 }
 
-static void
+void
 same70_toggle_io_pin (io_t *io,io_pin_t rpin) {
 	same70_io_pin_t pin = {rpin};
 	Pio *pio = same70_io_pin_pio (pin);

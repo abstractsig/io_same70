@@ -147,7 +147,7 @@ same70_time_clock_apply_timer_settings (Tc *timer) {
 	timer->TC_CHANNEL[0].TC_RB = 0x0000;
 	timer->TC_CHANNEL[0].TC_RC = 0;
 	timer->TC_CHANNEL[0].TC_EMR = 0;
-	timer->TC_CHANNEL[0].TC_IER = TC_IER_CPBS;
+	timer->TC_CHANNEL[0].TC_IER = TC_IER_CPBS;  // RB compare
 
 	timer->TC_CHANNEL[1].TC_CMR = (
 			TC_CMR_WAVE
@@ -174,7 +174,7 @@ same70_time_clock_apply_timer_settings (Tc *timer) {
 	timer->TC_CHANNEL[2].TC_RB = 0;
 	timer->TC_CHANNEL[2].TC_RC = 0;
 	timer->TC_CHANNEL[2].TC_EMR = 0;
-	timer->TC_CHANNEL[2].TC_IER = TC_IER_CPCS;
+	timer->TC_CHANNEL[2].TC_IER = TC_IER_CPCS;  // RC compare
 }
 
 //
@@ -273,13 +273,13 @@ start_same70_time_clock (io_t *io) {
 	}
 }
 
-static io_time_t
+io_time_t
 same70_get_time (io_t *io) {
 	io_same70_cpu_t *this = (io_same70_cpu_t*) io;
 	return same70_time_clock_get_time (&this->tc);
 }
 
-static void
+void
 same70_enqueue_alarm (io_t *io,io_alarm_t *alarm) {
 	same70_time_clock_t *this = &((io_same70_cpu_t*) io)->tc;
 	
@@ -306,7 +306,7 @@ same70_enqueue_alarm (io_t *io,io_alarm_t *alarm) {
 	EXIT_CRITICAL_SECTION(io);
 }
 
-static void
+void
 same70_dequeue_alarm (io_t *io,io_alarm_t *alarm) {
 	if (alarm->next_alarm != NULL) {
 		ENTER_CRITICAL_SECTION (io);

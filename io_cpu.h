@@ -35,7 +35,72 @@ typedef struct same70_trng {
 	
 } same70_trng_t;
 
-void	start_same70_trng (io_t*);
+io_byte_memory_t* same70_io_get_byte_memory (io_t*);
+bool same70_is_first_run (io_t*);
+uint32_t same70_get_random_u32 (io_t*);
+io_value_memory_t* same70_io_get_stvm (io_t*);
+void same70_do_gc (io_t*,int32_t);
+uint32_t same70_get_prbs_random_u32 (io_t*);
+void same70_panic (io_t*,int);
+void same70_signal_task_pending (io_t*);
+void same70_signal_event_pending (io_t*);
+bool same70_enqueue_task (io_t*,vref_t);
+bool same70_do_next_task (io_t*);
+bool same70_enter_critical_section (io_t*);
+void same70_exit_critical_section (io_t*,bool);
+bool same70_is_in_event_thread (io_t*);
+void same70_wait_for_event (io_t*);
+void same70_wait_for_all_events (io_t*);
+void same70_log (io_t*,char const*,va_list);
+io_time_t same70_get_time (io_t *io);
+void same70_write_to_io_pin (io_t*,io_pin_t,int32_t);
+void same70_toggle_io_pin (io_t *io,io_pin_t rpin) ;
+int32_t same70_read_io_input_pin (io_t *io,io_pin_t rpin);
+void same70_set_io_pin_to_output (io_t*,io_pin_t);
+void same70_set_io_pin_to_input (io_t*,io_pin_t);
+void same70_set_io_pin_to_alternate (io_t*,io_pin_t);
+void same70_set_io_pin_interrupt (io_t*,io_pin_t,io_interrupt_handler_t*);
+bool same70_io_pin_test_valid (io_t *io,io_pin_t rpin);
+void same70_io_pin_release (io_t *io,io_pin_t rpin);
+void same70_enqueue_alarm (io_t *io,io_alarm_t *alarm);
+void same70_dequeue_alarm (io_t *io,io_alarm_t *alarm);
+void same70_register_interrupt_handler (io_t*,int32_t,io_interrupt_action_t,void*);
+bool same70_unregister_interrupt_handler (io_t*,int32_t,io_interrupt_action_t);
+
+#define SPECIALISE_CPU_IO_IMPLEMENTATION(S) \
+	SPECIALISE_IO_IMPLEMENTATION(S) \
+	.get_byte_memory = same70_io_get_byte_memory,\
+	.is_first_run = same70_is_first_run,\
+	.get_random_u32 = same70_get_random_u32,\
+	.get_short_term_value_memory = same70_io_get_stvm,\
+	.do_gc = same70_do_gc,\
+	.get_next_prbs_u32 = same70_get_prbs_random_u32,\
+	.signal_task_pending = same70_signal_task_pending,\
+	.signal_event_pending = same70_signal_event_pending,\
+	.enqueue_task = same70_enqueue_task, \
+	.do_next_task = same70_do_next_task, \
+	.get_time = same70_get_time,\
+	.enqueue_alarm = same70_enqueue_alarm,\
+	.dequeue_alarm = same70_dequeue_alarm,\
+	.enter_critical_section = same70_enter_critical_section,\
+	.exit_critical_section = same70_exit_critical_section,\
+	.in_event_thread = same70_is_in_event_thread,\
+	.wait_for_event = same70_wait_for_event,\
+	.wait_for_all_events = same70_wait_for_all_events,\
+	.set_io_pin_output = same70_set_io_pin_to_output,\
+	.set_io_pin_input = same70_set_io_pin_to_input,\
+	.set_io_pin_alternate = same70_set_io_pin_to_alternate,\
+	.write_to_io_pin = same70_write_to_io_pin,\
+	.read_from_io_pin = same70_read_io_input_pin,\
+	.toggle_io_pin = same70_toggle_io_pin,\
+	.set_io_pin_interrupt = same70_set_io_pin_interrupt,\
+	.valid_pin = same70_io_pin_test_valid,\
+	.release_io_pin = same70_io_pin_release,\
+	.register_interrupt_handler = same70_register_interrupt_handler,\
+	.unregister_interrupt_handler = same70_unregister_interrupt_handler,\
+	.panic = same70_panic,\
+	.log = same70_log,\
+	/**/
 
 //
 // cpu io
@@ -84,40 +149,40 @@ null_interrupt_handler (void *w) {
 //
 // io methods
 //
-static io_byte_memory_t*
+io_byte_memory_t*
 same70_io_get_byte_memory (io_t *io) {
 	io_same70_cpu_t *this = (io_same70_cpu_t*) io;
 	return this->bm;
 }
 
-static io_value_memory_t*
+io_value_memory_t*
 same70_io_get_stvm (io_t *io) {
 	io_same70_cpu_t *this = (io_same70_cpu_t*) io;
 	return this->vm;
 }
 
-static void
+void
 same70_do_gc (io_t *io,int32_t count) {
 	io_value_memory_do_gc (io_get_short_term_value_memory (io),count);
 }
 
-static void
+void
 same70_signal_task_pending (io_t *io) {
 	// no action required
 }
 
-static void
+void
 same70_signal_event_pending (io_t *io) {
 	SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
 }
 
-static bool
+bool
 same70_enqueue_task (io_t *io,vref_t r_task) {
 	io_same70_cpu_t *this = (io_same70_cpu_t*) io;
 	return io_value_pipe_put_value (this->tasks,r_task);
 }
 
-static bool
+bool
 same70_do_next_task (io_t *io) {
 	io_same70_cpu_t *this = (io_same70_cpu_t*) io;
 	vref_t r_task;
@@ -135,32 +200,32 @@ same70_do_next_task (io_t *io) {
 	return false;
 }
 
-static bool
-same70_enter_critical_section (io_t *env) {
+bool
+same70_enter_critical_section (io_t *io) {
 	uint32_t interrupts_are_enabled = !(__get_PRIMASK() & 0x1);
 	DISABLE_INTERRUPTS;
 	return interrupts_are_enabled;
 }
 
 void
-same70_exit_critical_section (io_t *env,bool were_enabled) {
+same70_exit_critical_section (io_t *io,bool were_enabled) {
 	if (were_enabled) {
 		ENABLE_INTERRUPTS;
 	}
 }
 
-static bool
+bool
 same70_is_in_event_thread (io_t *io) {
 	return ((io_same70_cpu_t*) io)->in_event_thread;
 }
 
-static void
+void
 same70_wait_for_event (io_t *io) {
 	__WFI();
 }
 
-static void
-same70_for_all_events (io_t *io) {
+void
+same70_wait_for_all_events (io_t *io) {
 	io_event_t *event;
 	io_alarm_t *alarm;
 	do {
@@ -170,11 +235,10 @@ same70_for_all_events (io_t *io) {
 		EXIT_CRITICAL_SECTION(io);
 	} while (
 			event != &s_null_io_event
-		&&	alarm != &s_null_io_alarm
+		||	alarm != &s_null_io_alarm
 	);
 }
-
-static void	
+void	
 same70_register_interrupt_handler (
 	io_t *io,int32_t number,io_interrupt_action_t handler,void *user_value
 ) {
@@ -185,7 +249,7 @@ same70_register_interrupt_handler (
 	i->user_value = user_value;
 }
 
-static bool	
+bool	
 same70_unregister_interrupt_handler (
 	io_t *io,int32_t number,io_interrupt_action_t handler
 ) {
@@ -205,7 +269,7 @@ INLINE_FUNCTION uint32_t prbs_rotl(const uint32_t x, int k) {
 	return (x << k) | (x >> (32 - k));
 }
 
-static uint32_t
+uint32_t
 same70_get_prbs_random_u32 (io_t *io) {
 	io_same70_cpu_t *this = (io_same70_cpu_t*) io;
 	uint32_t *s = this->prbs_state;
@@ -227,58 +291,21 @@ same70_get_prbs_random_u32 (io_t *io) {
 	return result;
 }
 
-static bool
+bool
 same70_is_first_run (io_t *io) {
 	io_same70_cpu_t *this = (io_same70_cpu_t*) io;
 	return this->first_run;
 }
 
-static void
+void
 same70_panic (io_t *io,int code) {
 	DISABLE_INTERRUPTS;
 	while (1);
 }
 
-static void
+void
 same70_log (io_t *io,char const *fmt,va_list va) {
 	// ...
-}
-
-void
-add_io_implementation_cpu_methods (io_implementation_t *io_i) {
-	add_io_implementation_core_methods (io_i);
-
-	io_i->is_first_run = same70_is_first_run;
-	io_i->get_byte_memory = same70_io_get_byte_memory;
-	io_i->get_short_term_value_memory = same70_io_get_stvm;
-	io_i->do_gc = same70_do_gc;
-	io_i->get_random_u32 = same70_get_random_u32;
-	io_i->get_next_prbs_u32 = same70_get_prbs_random_u32;
-	io_i->signal_task_pending = same70_signal_task_pending;
-	io_i->enqueue_task = same70_enqueue_task;
-	io_i->do_next_task = same70_do_next_task;
-	io_i->signal_event_pending = same70_signal_event_pending;
-	io_i->enter_critical_section = same70_enter_critical_section;
-	io_i->exit_critical_section = same70_exit_critical_section;
-	io_i->in_event_thread = same70_is_in_event_thread;
-	io_i->wait_for_event = same70_wait_for_event;
-	io_i->get_time = same70_get_time,
-	io_i->enqueue_alarm = same70_enqueue_alarm;
-	io_i->dequeue_alarm = same70_dequeue_alarm;
-	io_i->register_interrupt_handler = same70_register_interrupt_handler;
-	io_i->unregister_interrupt_handler = same70_unregister_interrupt_handler;
-	io_i->wait_for_all_events = same70_for_all_events;
-	io_i->set_io_pin_output = same70_set_io_pin_to_output,
-	io_i->set_io_pin_input = same70_set_io_pin_to_input,
-	io_i->set_io_pin_interrupt = same70_set_io_pin_interrupt,
-	io_i->set_io_pin_alternate = same70_set_io_pin_to_alternate,
-	io_i->read_from_io_pin = same70_read_io_input_pin,
-	io_i->write_to_io_pin = same70_write_to_io_pin,
-	io_i->toggle_io_pin = same70_toggle_io_pin,
-	io_i->valid_pin = same70_io_pin_test_valid,
-	io_i->release_io_pin = same70_io_pin_release,
-	io_i->panic = same70_panic;
-	io_i->log = same70_log;
 }
 
 static void
@@ -479,208 +506,6 @@ const void* s_flash_vector_table[NUMBER_OF_INTERRUPT_VECTORS] = {
 };
 
 #endif /* IMPLEMENT_IO_CPU */
-#ifdef IMPLEMENT_VERIFY_IO_CPU
-TEST_BEGIN(test_io_random_1) {
-	uint32_t rand[3];
-
-/*	rand[0] = io_get_random_u32(TEST_IO);
-	rand[1] = io_get_random_u32(TEST_IO);
-	rand[2] = io_get_random_u32(TEST_IO);
-
-
-	if (rand[0] == rand[1])	rand[1] = io_get_random_u32(TEST_IO);
-	if (rand[0] == rand[1]) rand[1] = io_get_random_u32(TEST_IO);
-	if (rand[0] == rand[1]) rand[1] = io_get_random_u32(TEST_IO);
-
-	if (rand[1] == rand[2]) rand[2] = io_get_random_u32(TEST_IO);
-	if (rand[1] == rand[2]) rand[2] = io_get_random_u32(TEST_IO);
-	if (rand[1] == rand[2]) rand[2] = io_get_random_u32(TEST_IO);
-
-	VERIFY(rand[0] != rand[1],NULL);
-	VERIFY(rand[1] != rand[2],NULL);
-*/
-	rand[0] = io_get_next_prbs_u32(TEST_IO);
-	rand[1] = io_get_next_prbs_u32(TEST_IO);
-	rand[2] = io_get_next_prbs_u32(TEST_IO);
-
-	if (rand[0] == rand[1])	rand[1] = io_get_next_prbs_u32(TEST_IO);
-	if (rand[0] == rand[1]) rand[1] = io_get_next_prbs_u32(TEST_IO);
-	if (rand[0] == rand[1]) rand[1] = io_get_next_prbs_u32(TEST_IO);
-
-	if (rand[1] == rand[2]) rand[2] = io_get_next_prbs_u32(TEST_IO);
-	if (rand[1] == rand[2]) rand[2] = io_get_next_prbs_u32(TEST_IO);
-	if (rand[1] == rand[2]) rand[2] = io_get_next_prbs_u32(TEST_IO);
-
-	VERIFY(rand[0] != rand[1],NULL);
-	VERIFY(rand[1] != rand[2],NULL);
-}
-TEST_END
-
-static void
-test_io_events_1_ev (io_event_t *ev) {
-	*((uint32_t*) ev->user_value) = 1;
-}
-
-TEST_BEGIN(test_io_events_1) {
-	volatile uint32_t a = 0;
-	io_event_t ev;
-		
-	initialise_io_event (&ev,test_io_events_1_ev,(void*) &a);
-
-	io_enqueue_event (TEST_IO,&ev);
-	while (a == 0);
-	VERIFY (a == 1,NULL);
-}
-TEST_END
-
-TEST_BEGIN(test_time_clock_alarms_1) {
-	volatile uint32_t a = 0;
-	io_alarm_t alarm;
-	io_event_t ev;
-	io_time_t t;
-	initialise_io_event (&ev,test_io_events_1_ev,(void*) &a);
-	
-	t = io_get_time (TEST_IO);
-	initialise_io_alarm (
-		&alarm,&ev,&ev,
-		(io_time_t) {t.nanoseconds + millisecond_time(200).nanoseconds}
-	);
-
-	io_enqueue_alarm (TEST_IO,&alarm);
-	
-	while (a == 0);
-	VERIFY (a == 1,NULL);	
-}
-TEST_END
-
-static void
-test_io_backroom_1_entry (io_backroom_t *p) {
-	(*((int*) p->user_value))++;
-}
-
-TEST_BEGIN(test_io_backroom_1) {
-	io_byte_memory_t *bm = io_get_byte_memory (TEST_IO);
-	memory_info_t begin,end;
-	io_backroom_t *br;
-	int r = 0;
-	
-	io_byte_memory_get_info (bm,&begin);
-
-	br = create_io_backroom (TEST_IO,test_io_backroom_1_entry,&r,256);
-	VERIFY (switch_to_backroom (br) && r == 1,NULL);
-
-	free_io_backroom (br);
-
-	io_byte_memory_get_info (bm,&end);
-	VERIFY (end.used_bytes == begin.used_bytes,NULL);
-}
-TEST_END
-
-static void
-test_io_backroom_2_entry (io_backroom_t *p) {
-	int *c = p->user_value;
-	
-	while (*c < 2) {
-		*c = *c + 1;
-		yield_to_main (p);
-	}
-}
-
-TEST_BEGIN(test_io_backroom_2) {
-	io_byte_memory_t *bm = io_get_byte_memory (TEST_IO);
-	memory_info_t begin,end;
-	io_backroom_t *br;
-	int r = 0;
-	
-	io_byte_memory_get_info (bm,&begin);
-
-	br = create_io_backroom (TEST_IO,test_io_backroom_2_entry,&r,256);
-	while (switch_to_backroom (br));
-	
-	VERIFY (r == 2,NULL);
-
-	free_io_backroom (br);
-
-	io_byte_memory_get_info (bm,&end);
-	VERIFY (end.used_bytes == begin.used_bytes,NULL);
-}
-TEST_END
-
-static void
-test_io_backroom_3_entry (io_backroom_t *br) {
-	int *c = br->user_value;
-	
-	while (1) {
-		*c = *c + 1;
-		if (*c >= 2) break;
-		yield_to_main (br);
-	};
-}
-
-TEST_BEGIN(test_io_backroom_3) {
-	io_byte_memory_t *bm = io_get_byte_memory (TEST_IO);
-	memory_info_t begin,end;
-	io_backroom_t *p1,*p2;
-	int r = 0, s = 1;
-	
-	io_byte_memory_get_info (bm,&begin);
-
-	p1 = create_io_backroom (TEST_IO,test_io_backroom_3_entry,&r,256);
-	p2 = create_io_backroom (TEST_IO,test_io_backroom_3_entry,&s,256);
-
-	VERIFY (switch_to_backroom (p2),NULL);
-	VERIFY (r == 0 && s == 2,NULL);
-	VERIFY (switch_to_backroom (p1),NULL);
-	VERIFY (r == 1 && s == 2,NULL);
-	
-	VERIFY (switch_to_backroom (p1),NULL);
-	
-	VERIFY (s == 2 && r == 2,NULL);
-	VERIFY (!switch_to_backroom (p2),NULL);
-	VERIFY (s == 2 && r == 2,NULL);
-
-	VERIFY (!switch_to_backroom (p1),NULL);
-	VERIFY (!switch_to_backroom (p2),NULL);
-
-	free_io_backroom (p1);
-	free_io_backroom (p2);
-
-	io_byte_memory_get_info (bm,&end);
-	VERIFY (end.used_bytes == begin.used_bytes,NULL);
-}
-TEST_END
-
-UNIT_SETUP(setup_io_cpu_unit_test) {
-	return VERIFY_UNIT_CONTINUE;
-}
-
-UNIT_TEARDOWN(teardown_io_cpu_unit_test) {
-}
-
-void
-io_cpu_unit_test (V_unit_test_t *unit) {
-	static V_test_t const tests[] = {
-		test_io_events_1,
-		test_time_clock_alarms_1,
-#if 1
-		test_io_backroom_1,
-		test_io_backroom_2,
-		test_io_backroom_3,
-#endif
-		0
-	};
-	unit->name = "io cpu";
-	unit->description = "io cpu unit test";
-	unit->tests = tests;
-	unit->setup = setup_io_cpu_unit_test;
-	unit->teardown = teardown_io_cpu_unit_test;
-}
-#define IO_CPU_UNIT_TESTS \
-	io_cpu_unit_test, \
-	/**/
-#else
-#define IO_CPU_UNIT_TESTS
-#endif /* IMPLEMENT_VERIFY_IO_CPU */
 #endif
 /*
 ------------------------------------------------------------------------------

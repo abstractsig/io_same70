@@ -13,17 +13,8 @@
 //
 //-----------------------------------------------------------------------------
 
-static uint32_t
-same70_get_random_u32 (io_t *io) {
-	#if 1
-	return 0x8764000;
-	#else
-	while ((TRNG->TRNG_ISR & TRNG_ISR_DATRDY) == 0);
-	return TRNG->TRNG_ODATA;
-	#endif
-}
 
-void
+static void
 start_same70_trng (io_t *io) {
 	io_same70_cpu_t *this = (io_same70_cpu_t*) io;
 
@@ -35,9 +26,20 @@ start_same70_trng (io_t *io) {
 		);
 		
 		this->trng.started = 1;
-	}
-	
+	}	
 }
+
+uint32_t
+same70_get_random_u32 (io_t *io) {
+	start_same70_trng (io);
+	#if 1
+	return 0x8764000;
+	#else
+	while ((TRNG->TRNG_ISR & TRNG_ISR_DATRDY) == 0);
+	return TRNG->TRNG_ODATA;
+	#endif
+}
+
 
 #endif /* IMPLEMENT_IO_CPU */
 #endif
