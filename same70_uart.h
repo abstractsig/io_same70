@@ -73,7 +73,7 @@ static io_socket_t*
 same70_uart_initialise (io_socket_t *socket,io_t *io,io_settings_t const *C) {
 	same70_uart_t *this = (same70_uart_t*) socket;
 
-	this->io = io;
+	initialise_io_socket (socket,io);
 	this->encoding = C->encoding;
 	
 	this->tx_pipe = mk_io_encoding_pipe (
@@ -141,6 +141,9 @@ same70_uart_put_char (Uart* uart, uint8_t c) {
 	uart->UART_THR = c;
 }
 
+//
+// this is called in event thread
+//
 static bool
 same70_uart_open (io_socket_t *socket,io_socket_open_flag_t flag) {
 	same70_uart_t *this = (same70_uart_t*) socket;
